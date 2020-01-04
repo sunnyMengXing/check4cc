@@ -6,9 +6,11 @@
 PyInstaller -F c:\Personal\Git\check4cc\checkInterpark_exe.py
 ```
 ### Usage:
-+ 双击checkInterpark_exe即可
-+ Inout:
-  + ticketType -- 必须输入，类型同上
++ 点击绿色写着“clone or download”按钮，download zip，下载到本地
++ 解压缩
++ 双击checkInterpark_exe.exe
++ Input:
+  + ticketType -- 必须输入，类型0206|0207|0208|0209|gala|package
   + audioPath -- 必须输入，提示音频的路径，可以直接把音频拖到窗口里，建议全英文，不要使用中文
 + 主函数和python中是一致的，这个版本为了打包方便
 + TODO: merge two version
