@@ -2,7 +2,7 @@ import urllib.request
 from playsound import playsound
 import os, re, argparse
 
-ALERTAUDIOFILEPATH = 'MengHuiTangKa.wav'
+ALERTAUDIOFILEPATH = "MengHuiTangKa.wav"
 GLOBALURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/Lib/BookInfoXml.asp?Flag=SeatGrade&PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&BizCode=10965&PlaySeq=001"
 ALLBLOCKURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/Lib/BookInfoXml.asp?Flag=AllBlock&PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&PlaySeq=001&Tiki=N&TmgsOrNot=D2003"
 TABLELENGTH = 2
@@ -45,37 +45,39 @@ def getAllBlockInfo(goodsCode):
     return blockNameList, blockRemainCntList
 
 def main(ticketType, goodsCode):
-    isPlayed = False
     count = 0
-    while(not isPlayed):
+    while(True):
         print(ticketType + "\tsearch iterate " + str(count))
         count += 1
+        isAlert = False
 
-        remainTableList = getGlobalInfo(goodsCode)
+        remainTableList = getGlobalInfo(goodsCode)       
         assert(len(remainTableList) == TABLELENGTH)
         blockInfo = None
 
         ### gold
         if (gradeType == 1 or gradeType == 0) and int(remainTableList[0]) > ticketThreshold:
+            print("!!!!!!gold checked \t" + remainTableList[0])
             blockInfo = getAllBlockInfo(goodsCode)
             for i in range(goldCount):
                 if int(blockInfo[1][i]) > 0:
-                    if not isPlayed:
-                        playsound(ALERTAUDIOFILEPATH, False)
-                        isPlayed = True
                     print("gold\t" + blockInfo[0][i] + '\t' + blockInfo[1][i])
+                    isAlert = True
 
         ### silver
         if gradeType == 2 or gradeType == 0 and int(remainTableList[1]) > ticketThreshold:
+            print("!!!!!!silver checked \t" + remainTableList[1])
             if blockInfo == None:
                 blockInfo = getAllBlockInfo(goodsCode)
             
             for i in range(goldCount, silverCount):
                 if int(blockInfo[1][i]) > 0:
-                    if not isPlayed:
-                        playsound(ALERTAUDIOFILEPATH, False)
-                        isPlayed = True
                     print("silver\t" + blockInfo[0][i] + '\t' + blockInfo[1][i])
+                    isAlert = True
+
+        if isAlert:
+            playsound(ALERTAUDIOFILEPATH, True)
+            break
 
 
 if __name__ == "__main__":
