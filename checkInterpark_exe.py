@@ -1,11 +1,20 @@
 import urllib.request
-from bs4 import BeautifulSoup
 from playsound import playsound
 import os, re, argparse
 
 ALERTAUDIOFILEPATH = 'MengHuiTangKa.wav'
-TABLEURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/Lib/BookInfoXml.asp?Flag=SeatGradeBlock&PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&Tiki=N&BizCode=10965&PlaySeq=001&TmgsOrNot=D2003"
-BLOCKURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/BookSeatDetail.asp?PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&PlaySeq=001&SeatGrade=&TmgsOrNot=D2003&LocOfImage=&Tiki=N&UILock=Y&SessionId=8647CB8EEFF042B2ACF86C8B1586FBC0&BizCode=10965&GoodsBizCode=12930"
+GLOBALURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/Lib/BookInfoXml.asp?Flag=SeatGrade&PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&BizCode=10965&PlaySeq=001"
+ALLBLOCKURL = "https://gpoticket.globalinterpark.com/Global/Play/Book/Lib/BookInfoXml.asp?Flag=AllBlock&PlaceCode=19001504&LanguageType=G2001&MemBizCode=10965&PlaySeq=001&Tiki=N&TmgsOrNot=D2003"
+TABLELENGTH = 2
+
+### User defined
+ticketThreshold = 5
+### 0-all 1-gold 2-silver
+gradeType = 0
+
+### Count of each table
+goldCount = 18
+silverCount = 24
 
 ### Goods code on interpark
 goodsCode0206 = "19016425"
@@ -19,37 +28,21 @@ def urlRequest(url):
     tmp = urllib.request.urlopen(url).read()
     return tmp.decode('utf-8')
 
-def getTabelPathInfo(goodsCode, ticketType):   
-    url = TABLEURL + "&GoodsCode=" + goodsCode + "&SeatGrade=" + str(ticketType) + "&SeatGradeIdx=" + str(ticketType)
-    pageInfo = urlRequest(url)
-    soup = BeautifulSoup(pageInfo, "html.parser")
+def getGlobalInfo(goodsCode):
+    url = GLOBALURL + "&GoodsCode=" + goodsCode
+    info = str(urlRequest(url))
 
-    blockNameList = soup.find_all('selfdefineblock')
-    blockRemainCntList = soup.find_all('totalremaincnt')
+    return re.findall(r"<RemainCnt>(.+?)</RemainCnt>", info)
 
+def getAllBlockInfo(goodsCode):
+    url = ALLBLOCKURL + "&GoodsCode=" + goodsCode
+    info = str(urlRequest(url))
+
+    blockNameList = re.findall(r"<SelfDefineBlock>(.+?)</SelfDefineBlock>", info)
+    blockRemainCntList = re.findall(r"<RemainCnt>(.+?)</RemainCnt>", info)
     assert(len(blockNameList) == len(blockRemainCntList))
-    
-    return  blockNameList, blockRemainCntList
-        
-def getRemainTabelList(blockNameList, remainCntList):
-    res = []
-    for i in range(len(blockNameList)):
-        if str(remainCntList[i]) != "<totalremaincnt>0</totalremaincnt>":
-            res.append(str(re.findall(r"<selfdefineblock>(.+?)</selfdefineblock>",str(blockNameList[i]))[0]))
-    return res
 
-def getRemainBlockList(remainList, isPlayed, ticketType, goodsCode):
-    url = BLOCKURL + "&GoodsCode=" + goodsCode + "&Block="
-    for block in remainList:
-        detailInfo = urllib.request.urlopen(url + block).read()
-        detailInfo = str(detailInfo.decode('utf-8'))
-        if detailInfo.find("<span class='SeatN' id=\"Seats\"") > 0:
-            if not isPlayed:
-                playsound(ALERTAUDIOFILEPATH, False)
-                isPlayed = True
-            print(ticketType + "\t" + block)
-    
-    return isPlayed
+    return blockNameList, blockRemainCntList
 
 def main(ticketType, goodsCode):
     isPlayed = False
@@ -58,21 +51,39 @@ def main(ticketType, goodsCode):
         print(ticketType + "\tsearch iterate " + str(count))
         count += 1
 
-        ### ticketType: 1-gold, 2-silver
-        goldBlockNameList, goldRemainCntList = getTabelPathInfo(goodsCode, 1)
-        silverBlockNameList, silverRemainCntList = getTabelPathInfo(goodsCode, 2)
+        remainTableList = getGlobalInfo(goodsCode)
+        assert(len(remainTableList) == TABLELENGTH)
+        blockInfo = None
 
-        goldRemainList = getRemainTabelList(goldBlockNameList, goldRemainCntList)
-        silverRemainList = getRemainTabelList(silverBlockNameList, silverRemainCntList)
-        
-        isPlayed = getRemainBlockList(goldRemainList, isPlayed, ticketType, goodsCode)
-        isPlayed = getRemainBlockList(silverRemainList, isPlayed, ticketType, goodsCode)
+        ### gold
+        if (gradeType == 1 or gradeType == 0) and int(remainTableList[0]) > ticketThreshold:
+            blockInfo = getAllBlockInfo(goodsCode)
+            for i in range(goldCount):
+                if int(blockInfo[1][i]) > 0:
+                    if not isPlayed:
+                        playsound(ALERTAUDIOFILEPATH, False)
+                        isPlayed = True
+                    print("gold\t" + blockInfo[0][i] + '\t' + blockInfo[1][i])
+
+        ### silver
+        if gradeType == 2 or gradeType == 0 and int(remainTableList[1]) > ticketThreshold:
+            if blockInfo == None:
+                blockInfo = getAllBlockInfo(goodsCode)
+            
+            for i in range(goldCount, silverCount):
+                if int(blockInfo[1][i]) > 0:
+                    if not isPlayed:
+                        playsound(ALERTAUDIOFILEPATH, False)
+                        isPlayed = True
+                    print("silver\t" + blockInfo[0][i] + '\t' + blockInfo[1][i])
 
 if __name__ == "__main__":
     # Main
     while True:
-        ticketType = input("Enter ticket type: 0206|0207|0208|0209|gala|package")
-        audioPath = input("Enter alert audio file path")
+        ticketType = input("Enter ticket type(0206|0207|0208|0209|gala|package):")
+        audioPath = input("Enter alert audio file path:")
+        gradeTypeTmp = input("Enter the grade type(0-all, 1-gold, 2-silver):")
+        ticketThresholdTmp = input("Enter the minimun of ticket count(such as 10):")
     
         if os.path.exists(audioPath):
             ALERTAUDIOFILEPATH = audioPath
@@ -90,6 +101,12 @@ if __name__ == "__main__":
                 main(ticketType, goodsCodePACK)
             else:
                 print('Input type error！')
+
+            if len(gradeTypeTmp) > 0:
+                gradeType = int(gradeTypeTmp)
+            if len(ticketThresholdTmp) > 0:
+                ticketThreshold = int(ticketThresholdTmp)
+
         else:
             print('Audio path not exist!')
 
